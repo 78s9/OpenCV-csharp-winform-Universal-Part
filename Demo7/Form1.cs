@@ -4,6 +4,7 @@ using OpenCvSharp.Extensions;
 using System.IO;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace Demo7
 {
@@ -94,6 +95,11 @@ namespace Demo7
                 originalImage = IncreaseBrightness(test1,115);
                 Cv2.ImShow("原图加亮（增加115）",originalImage);
 
+                Mat test = new Mat();
+                test = ScharrMat(originalImage);
+
+
+
                 Mat grad_x = new Mat();
                 Mat grad_y = new Mat();
                 Mat abs_grad_x = new Mat();
@@ -111,11 +117,6 @@ namespace Demo7
 
                 Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, ds1);
                 //Cv2.ImShow("整体图片",ds1);
-
-                Cv2.Scharr(originalImage, grad_x, MatType.CV_16S, 1, 0, 1, 0, BorderTypes.Default);
-
-
-
 
                 Mat binary1 = new Mat();
 
@@ -175,8 +176,7 @@ namespace Demo7
                     }
                 }
 
-                Cv2.ImShow("轮廓检测结果", result);
-
+                Cv2.ImShow("用Sobel轮廓检测结果", result);
 
 
                 // 灰度转换
@@ -238,13 +238,13 @@ namespace Demo7
 
                 // 边缘检测
                 Mat edges = new Mat();
-                Cv2.Canny(dilated7, edges, 50, 150);
+                Cv2.Canny(binary, edges, 50, 150);
                 //Cv2.ImShow("edges",edges);
 
                 Cv2.FindContours(edges, out OpenCvSharp.Point[][] contours, out HierarchyIndex[] hierarchy,
                  RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
-                Console.WriteLine($"找到 {contours.Length} 个轮廓");
+                //Console.WriteLine($"找到 {contours.Length} 个轮廓");
 
 
                 ////尝试霍夫圆解决问题
@@ -320,13 +320,56 @@ namespace Demo7
             Mat grad_y = new Mat();
             Mat abs_grad_x = new Mat();
             Mat abs_grad_y = new Mat();
-            Mat ds1 = new Mat();
+            Mat dst = new Mat();
 
-            Cv2.ImShow("原图",src);
+            //Cv2.ImShow("原图",src);
 
+            //用scharr函数求X方向梯度
+            Cv2.Scharr(src, grad_x, MatType.CV_16S, 1, 0, 1, 0, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
+            //Cv2.ImShow("[效果图]Xf方向Scharr", abs_grad_x);
 
+            //用scharr函数求X方向梯度
+            Cv2.Scharr(src, grad_y, MatType.CV_16S, 0, 1, 1, 0, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_y, abs_grad_y);
+            //Cv2.ImShow("[效果图]Yf方向Scharr", abs_grad_y);
 
+            //合并梯度
+            Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, dst);
+            Cv2.ImShow("[效果图]合并后的Scharr", dst);
 
+            Mat gray = new Mat();
+
+            //确保ds1是单通道8位图像
+            if (dst.Type() != MatType.CV_8UC1)
+            {
+                //如果是其他类型，转换为8位单通道
+                if (dst.Type() == MatType.CV_8UC3)
+                {
+                    //如果是三通道，转换为灰度图
+                    Cv2.CvtColor(dst, gray, ColorConversionCodes.BGR2GRAY);
+                }
+                else
+                {
+                    //如果是其他类型（如16位），转换为8位
+                    dst.ConvertTo(gray, MatType.CV_8UC1);
+                }
+            }
+            else
+            {
+                dst.CopyTo(gray);
+            }
+
+            if (dst.Type() == MatType.CV_8UC3)
+            {
+                //如果是三通道，转换为灰度图
+                Cv2.CvtColor(dst, gray, ColorConversionCodes.BGR2GRAY);
+            }
+
+            //二值化
+            Mat binary = new Mat();
+            Cv2.Threshold(gray, binary, thresholdValue, maxValue, ThresholdTypes.Otsu);
+            //Console.WriteLine($"二值化后图像类型: {binary.Type()}, 通道数: {binary.Channels()}");
 
 
             return src;
