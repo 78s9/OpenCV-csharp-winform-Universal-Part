@@ -97,9 +97,12 @@ namespace Demo7
 
                 Mat test1 = new Mat();
                 Mat test2 = new Mat();
+                Mat test3 = new Mat();
+                Mat test4 = new Mat();
 
-                test2 = SobelMat(originalImage);
                 test1 = ScharrMat(originalImage);
+                test2 = SobelMat(originalImage);
+                //test3 = CornerHarrisone(originalImage);
 
                 // 灰度转换
                 Mat gray = new Mat();
@@ -116,6 +119,9 @@ namespace Demo7
                     gray = originalImage.Clone(); // 已经是灰度图
                 }
                 //Cv2.ImShow("gray",gray);
+
+                //霍夫曼画圆需要输入灰度图
+                test4 = HoughCircles(gray);
 
                 // 高斯模糊
                 Mat blurred = new Mat();
@@ -136,15 +142,19 @@ namespace Demo7
                 // 使用3x3的矩形核
                 Mat kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(3, 3));
                 // 创建不同形状的核
-                Mat rectKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(5, 5));               //按照矩形进行膨胀、侵蚀，适合去除大噪声
-                Mat ellipseKernel3 = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(30, 30));      //按照圆来进行膨胀、侵蚀，适合保留形状
-                Mat crossKernel = Cv2.GetStructuringElement(MorphShapes.Cross, new OpenCvSharp.Size(5, 5));             //按照十字进行膨胀、侵蚀，适合保留笔画特征
+                Mat rectKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(5, 5));            //按照矩形进行膨胀、侵蚀，适合去除大噪声
+                Mat ellipseKernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(5, 5));      //按照圆来进行膨胀、侵蚀，适合保留形状
+                Mat crossKernel = Cv2.GetStructuringElement(MorphShapes.Cross, new OpenCvSharp.Size(5, 5));          //按照十字进行膨胀、侵蚀，适合保留笔画特征
 
                 //膨胀
-                Mat dilated1 = new Mat();
-                Cv2.Dilate(binary, dilated1, kernel);
+                Mat dilated = new Mat();
+                Mat a = new Mat();
+                Mat Imag = new Mat();
+
+                Cv2.Dilate(test, Imag, ellipseKernel);
+                Cv2.Dilate(binary, dilated, kernel);
                 //Cv2.ImShow("膨胀1", dilated1);
-                //Cv2.ImShow("膨胀7", dilated7);
+                //Cv2.ImShow("膨胀2", Imag);
 
                 //侵蚀
                 Mat eroded1 = new Mat();
@@ -185,29 +195,7 @@ namespace Demo7
                     }
                 }
 
-                Cv2.ImShow("用轮廓检测结果", result);
-
-                ////尝试霍夫圆解决问题
-                //CircleSegment[] circles = Cv2.HoughCircles(gray, HoughModes.Gradient, 1, 30, 100, 30, 5, 50);
-
-                //Mat op = new Mat();
-                //Cv2.CvtColor(gray, op, ColorConversionCodes.GRAY2BGR);
-                //foreach (CircleSegment circle in circles)
-                //{
-                //    // 直接从这里获取圆心坐标
-                //    Point2f center = circle.Center;
-                //    float radius = circle.Radius;
-
-                //    Console.WriteLine($"找到一个圆，圆心在 ({center.X}, {center.Y})，半径为 {radius}");
-
-                //    // 在新图像上绘制圆心（红色）
-                //    Cv2.Circle(op, (int)center.X, (int)center.Y, 1, new Scalar(0, 0, 255), 2);
-
-                //    // 可选：绘制圆轮廓（绿色）
-                //    Cv2.Circle(op, (int)center.X, (int)center.Y, (int)radius, new Scalar(0, 255, 0), 2);
-                //}
-                //Cv2.ImShow("检测的圆", op);
-
+                //Cv2.ImShow("用轮廓检测结果", result);
 
                 if (pictureBox1.Image != null)
                 {
@@ -250,6 +238,65 @@ namespace Demo7
 
             }
         }
+        //用harris角点检测找出角点
+        public Mat CornerHarrisone(Mat image)
+        {
+            Mat src = new Mat();
+            src = image.Clone();
+            Mat cornerStrength = new Mat();
+            //Console.WriteLine($"二值化后图像类型: {src.Type()}, 通道数: {src.Channels()}");
+            Mat prosses = new Mat();
+
+            if (src.Channels() == 3)
+            {
+                Console.WriteLine("将3通道彩色图转换为灰度图");
+                Cv2.CvtColor(src, prosses, ColorConversionCodes.BGR2GRAY);
+            }
+            if (src.Channels() == 4)
+            {
+                Console.WriteLine("将4通道图转换为灰度图");
+                Cv2.CvtColor(src, prosses, ColorConversionCodes.BGRA2GRAY);
+            }
+
+            Cv2.CornerHarris(prosses, cornerStrength, 2, 3, 0.01);
+
+            Mat harrisConrner = new Mat();
+            Cv2.Threshold(cornerStrength, harrisConrner, 0.00001, 255, ThresholdTypes.Binary);
+            Cv2.ImShow("角点检测后的二值效果图：", harrisConrner);
+
+            return src;
+        }
+
+        //霍夫曼画圆
+        public Mat HoughCircles(Mat image)
+        {
+            //只收灰度图
+            Mat src = new Mat();
+            src = image.Clone();
+
+            CircleSegment[] circles = Cv2.HoughCircles(src, HoughModes.Gradient, 1, 30, 100, 30, 5, 50);
+
+            Mat op = new Mat();
+            Cv2.CvtColor(src, op, ColorConversionCodes.GRAY2BGR);
+            foreach (CircleSegment circle in circles)
+            {
+                // 直接从这里获取圆心坐标
+                Point2f center = circle.Center;
+                float radius = circle.Radius;
+
+                Console.WriteLine($"找到一个圆，圆心在 ({center.X}, {center.Y})，半径为 {radius}");
+
+                // 在新图像上绘制圆心（红色）
+                Cv2.Circle(op, (int)center.X, (int)center.Y, 1, new Scalar(0, 0, 255), 2);
+
+                // 可选：绘制圆轮廓（绿色）
+                Cv2.Circle(op, (int)center.X, (int)center.Y, (int)radius, new Scalar(0, 255, 0), 2);
+            }
+            //Cv2.ImShow("检测的圆", op);
+
+            return src;
+        }
+
         //调用Sobel函数
         public Mat SobelMat(Mat image)
         {
@@ -418,7 +465,7 @@ namespace Demo7
                 }
             }
 
-            Cv2.ImShow("用Soharr轮廓检测结果", result);
+            //Cv2.ImShow("用Soharr轮廓检测结果", result);
 
             return src;
         }
