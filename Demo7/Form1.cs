@@ -88,96 +88,18 @@ namespace Demo7
 
                 //加载图片到PictureBox
                 string fullPath = Path.Combine(_currentDirectory, seletedFile);
-                Mat test1 = new Mat();
-                test1 = LoadAndResizeImage(fullPath);
+                Mat test = new Mat();
+                test = LoadAndResizeImage(fullPath);
                 //Cv2.ImShow("原图", test1);
                 Mat originalImage =new Mat();
-                originalImage = IncreaseBrightness(test1,115);
-                Cv2.ImShow("原图加亮（增加115）",originalImage);
+                originalImage = IncreaseBrightness(test, 115);
+                //Cv2.ImShow("原图加亮（增加115）",originalImage);
 
-                Mat test = new Mat();
-                test = ScharrMat(originalImage);
+                Mat test1 = new Mat();
+                Mat test2 = new Mat();
 
-
-
-                Mat grad_x = new Mat();
-                Mat grad_y = new Mat();
-                Mat abs_grad_x = new Mat();
-                Mat abs_grad_y = new Mat();
-                Mat ds1 = new Mat();
-
-                //使用Sobel方法
-                Cv2.Sobel(originalImage, grad_x, MatType.CV_16S, 1, 0, 3, 1, 1,BorderTypes.Default);
-                Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
-                //Cv2.ImShow("X方向sobel",abs_grad_x);
-
-                Cv2.Sobel(originalImage, grad_y, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
-                Cv2.ConvertScaleAbs(grad_y, abs_grad_y);
-                //Cv2.ImShow("Y方向sobel", abs_grad_y);
-
-                Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, ds1);
-                //Cv2.ImShow("整体图片",ds1);
-
-                Mat binary1 = new Mat();
-
-
-                // 1. 确保ds1是单通道8位图像
-                if (ds1.Type() != MatType.CV_8UC1)
-                {
-                    // 如果是其他类型，转换为8位单通道
-                    if (ds1.Type() == MatType.CV_8UC3)
-                    {
-                        // 如果是三通道，转换为灰度图
-                        Cv2.CvtColor(ds1, binary1, ColorConversionCodes.BGR2GRAY);
-                    }
-                    else
-                    {
-                        // 如果是其他类型（如16位），转换为8位
-                        ds1.ConvertTo(binary1, MatType.CV_8UC1);
-                    }
-                }
-                else
-                {
-                    ds1.CopyTo(binary1);
-                }
-
-                if (ds1.Type() == MatType.CV_8UC3)
-                {
-                    // 如果是三通道，转换为灰度图
-                    Cv2.CvtColor(ds1, binary1, ColorConversionCodes.BGR2GRAY);
-                }
-
-                Mat binary2 = new Mat();
-                Cv2.Threshold(binary1, binary2, 50, 255, ThresholdTypes.Binary);
-                Console.WriteLine($"二值化后图像类型: {binary2.Type()}, 通道数: {binary2.Channels()}");
-
-                // 2. 查找轮廓
-                Point[][] contours2;
-                HierarchyIndex[] hierarchy3;
-                Cv2.FindContours(binary2, out contours2, out hierarchy3, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
-
-                // 3. 在原图上绘制轮廓
-                Mat result = binary2.Clone();
-                Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
-
-                for (int i = 0; i < contours2.Length; i++)
-                {
-                    // 可以过滤太小的轮廓（根据面积）
-                    double area = Cv2.ContourArea(contours2[i]);
-                    if (area > 100) // 只绘制面积大于100的轮廓
-                    {
-                        // 随机颜色或固定颜色
-                        Scalar color = new Scalar(0, 255, 0); // 绿色
-                        Cv2.DrawContours(result, contours2, i, color, 2);
-
-                        // 或者绘制轮廓的外接矩形
-                        Rect boundingRect = Cv2.BoundingRect(contours2[i]);
-                        //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
-                    }
-                }
-
-                Cv2.ImShow("用Sobel轮廓检测结果", result);
-
+                test2 = SobelMat(originalImage);
+                test1 = ScharrMat(originalImage);
 
                 // 灰度转换
                 Mat gray = new Mat();
@@ -205,12 +127,10 @@ namespace Demo7
                 Cv2.Threshold(blurred, binary, thresholdValue, maxValue, ThresholdTypes.Otsu);
                  //Cv2.ImShow("binary", binary);
 
-
                 // 反转二值图像
                 Mat dst = new Mat();
                 Cv2.BitwiseNot(binary, dst);
                 //Cv2.ImShow("dst", dst);
-
 
                 //创建结构元素（核）
                 // 使用3x3的矩形核
@@ -219,7 +139,6 @@ namespace Demo7
                 Mat rectKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(5, 5));               //按照矩形进行膨胀、侵蚀，适合去除大噪声
                 Mat ellipseKernel3 = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(30, 30));      //按照圆来进行膨胀、侵蚀，适合保留形状
                 Mat crossKernel = Cv2.GetStructuringElement(MorphShapes.Cross, new OpenCvSharp.Size(5, 5));             //按照十字进行膨胀、侵蚀，适合保留笔画特征
-
 
                 //膨胀
                 Mat dilated1 = new Mat();
@@ -246,10 +165,30 @@ namespace Demo7
 
                 //Console.WriteLine($"找到 {contours.Length} 个轮廓");
 
+                //在原图上绘制轮廓
+                Mat result = binary.Clone();
+                Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
+
+                for (int i = 0; i < contours.Length; i++)
+                {
+                    // 可以过滤太小的轮廓（根据面积）
+                    double area = Cv2.ContourArea(contours[i]);
+                    if (area > 100) // 只绘制面积大于100的轮廓
+                    {
+                        // 随机颜色或固定颜色
+                        Scalar color = new Scalar(0, 255, 0); // 绿色
+                        Cv2.DrawContours(result, contours, i, color, 2);
+
+                        // 或者绘制轮廓的外接矩形
+                        Rect boundingRect = Cv2.BoundingRect(contours[i]);
+                        //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
+                    }
+                }
+
+                Cv2.ImShow("用轮廓检测结果", result);
 
                 ////尝试霍夫圆解决问题
                 //CircleSegment[] circles = Cv2.HoughCircles(gray, HoughModes.Gradient, 1, 30, 100, 30, 5, 50);
-
 
                 //Mat op = new Mat();
                 //Cv2.CvtColor(gray, op, ColorConversionCodes.GRAY2BGR);
@@ -311,6 +250,89 @@ namespace Demo7
 
             }
         }
+        //调用Sobel函数
+        public Mat SobelMat(Mat image)
+        {
+            Mat scr = image.Clone();
+            Mat grad_x = new Mat();
+            Mat grad_y = new Mat();
+            Mat abs_grad_x = new Mat();
+            Mat abs_grad_y = new Mat();
+            Mat dst = new Mat();
+
+            //使用Sobel方法
+            Cv2.Sobel(scr, grad_x, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
+            //Cv2.ImShow("X方向sobel",abs_grad_x);
+
+            Cv2.Sobel(scr, grad_y, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_y, abs_grad_y);
+            //Cv2.ImShow("Y方向sobel", abs_grad_y);
+
+            Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, dst);
+            //Cv2.ImShow("整体图片",ds1);
+
+            Mat gray = new Mat();
+
+            // 1. 确保ds1是单通道8位图像
+            if (dst.Type() != MatType.CV_8UC1)
+            {
+                // 如果是其他类型，转换为8位单通道
+                if (dst.Type() == MatType.CV_8UC3)
+                {
+                    // 如果是三通道，转换为灰度图
+                    Cv2.CvtColor(dst, gray, ColorConversionCodes.BGR2GRAY);
+                }
+                else
+                {
+                    // 如果是其他类型（如16位），转换为8位
+                    dst.ConvertTo(gray, MatType.CV_8UC1);
+                }
+            }
+            else
+            {
+                dst.CopyTo(gray);
+            }
+
+            if (dst.Type() == MatType.CV_8UC3)
+            {
+                // 如果是三通道，转换为灰度图
+                Cv2.CvtColor(dst, gray, ColorConversionCodes.BGR2GRAY);
+            }
+
+            Mat binary = new Mat();
+            Cv2.Threshold(gray, binary, 50, 255, ThresholdTypes.Binary);
+            //Console.WriteLine($"二值化后图像类型: {binary2.Type()}, 通道数: {binary2.Channels()}");
+
+            //查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(binary, out contours, out hierarchy, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+            //在原图上绘制轮廓
+            Mat result = binary.Clone();
+            Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
+
+            for (int i = 0; i < contours.Length; i++)
+            {
+                // 可以过滤太小的轮廓（根据面积）
+                double area = Cv2.ContourArea(contours[i]);
+                if (area > 100) // 只绘制面积大于100的轮廓
+                {
+                    // 随机颜色或固定颜色
+                    Scalar color = new Scalar(0, 255, 0); // 绿色
+                    Cv2.DrawContours(result, contours, i, color, 2);
+
+                    // 或者绘制轮廓的外接矩形
+                    Rect boundingRect = Cv2.BoundingRect(contours[i]);
+                    //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
+                }
+            }
+
+            Cv2.ImShow("用Sobel轮廓检测结果", result);
+
+            return scr;
+        }
 
         //调用Scharr函数
         public Mat ScharrMat(Mat image)
@@ -336,7 +358,7 @@ namespace Demo7
 
             //合并梯度
             Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, dst);
-            Cv2.ImShow("[效果图]合并后的Scharr", dst);
+            //Cv2.ImShow("[效果图]合并后的Scharr", dst);
 
             Mat gray = new Mat();
 
@@ -371,6 +393,32 @@ namespace Demo7
             Cv2.Threshold(gray, binary, thresholdValue, maxValue, ThresholdTypes.Otsu);
             //Console.WriteLine($"二值化后图像类型: {binary.Type()}, 通道数: {binary.Channels()}");
 
+            //查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(binary, out contours, out hierarchy, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+            //在原图上绘制轮廓
+            Mat result = binary.Clone();
+            Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
+
+            for (int i = 0; i < contours.Length; i++)
+            {
+                // 可以过滤太小的轮廓（根据面积）
+                double area = Cv2.ContourArea(contours[i]);
+                if (area > 100) // 只绘制面积大于100的轮廓
+                {
+                    // 随机颜色或固定颜色
+                    Scalar color = new Scalar(0, 255, 0); // 绿色
+                    Cv2.DrawContours(result, contours, i, color, 2);
+
+                    // 或者绘制轮廓的外接矩形
+                    Rect boundingRect = Cv2.BoundingRect(contours[i]);
+                    //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
+                }
+            }
+
+            Cv2.ImShow("用Soharr轮廓检测结果", result);
 
             return src;
         }
