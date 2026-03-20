@@ -109,7 +109,7 @@ namespace Demo7
                 Mat test3 = new Mat();
                 Mat test4 = new Mat();
 
-                //test1 = ScharrMat(originalImage);
+                test1 = ScharrMat(originalImage);
                 //test2 = SobelMat(originalImage);
                 //test3 = CornerHarrisone(originalImage);
                 //test4 = HoughCircles(test1);
@@ -258,15 +258,13 @@ namespace Demo7
                 }
 
                 //Cv2.ImShow("用轮廓检测结果", result);
-                Mat ko = new Mat();
-
 
                 string imagePath = @"C:\Users\Lenovo\Desktop\work\Test3\8.bmp";
                 string templatePath = @"C:\Users\Lenovo\Desktop\work\Test3\CNN\13.Png";
                 string outputPath = @"D:\test\result.jpg";
 
                 //图形匹配
-                //IndustrialShapeMatcher.DetectByShapeMatching(imagePath, templatePath, outputPath);
+                //IndustrialShapeMatcher.DetectByShapeMatching(imagePath, templatePath, outpu想·tPath);
 
                 //特征点匹配
                 //FeatureMatcher.DetectByFeatureMatching(imagePath, templatePath, outputPath);
@@ -335,13 +333,12 @@ namespace Demo7
                                 new Scalar(255, 255, 255), 2);
 
                     // 显示图像
-                    Cv2.ImShow("Detected Center", displayImage);
+                    //Cv2.ImShow("Detected Center", displayImage);
                 }
                 else
                 {
                     Console.WriteLine("未找到圆心");
                 }
-
 
                 if (pictureBox1.Image != null)
                 {
