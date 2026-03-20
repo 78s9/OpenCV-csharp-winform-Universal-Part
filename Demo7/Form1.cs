@@ -69,7 +69,7 @@ namespace Demo7
             }
         }
         //增加图片亮度
-        public Mat IncreaseBrightness(Mat image, double brightnessValue)
+        public static Mat IncreaseBrightness(Mat image, double brightnessValue)
         {
             Mat result = new Mat();
             // brightnessValue > 0 增加亮度，< 0 降低亮度
@@ -94,10 +94,6 @@ namespace Demo7
                 string fullPath = Path.Combine(_currentDirectory, seletedFile);
                 Mat test = new Mat();
                 test = LoadAndResizeImage(fullPath);
-
-                string imagePath = @"C:\Users\Lenovo\Desktop\work\Test3\before\1.bmp";
-                string templatePath = @"C:\Users\Lenovo\Desktop\work\Test3\CNN\13.Png";
-                string outputPath = @"D:\test\result.jpg";
 
                 //Console.WriteLine($"原图像图像类型: {test.Type()}, 通道数: {test.Channels()}");
 
@@ -134,10 +130,6 @@ namespace Demo7
                 {
                     gray = originalImage.Clone(); // 已经是灰度图
                 }
-                //Cv2.ImShow("gray",gray);
-
-                //霍夫曼画圆需要输入灰度图
-                //test4 = HoughCircles(gray);
 
                 //均值滤波
                 Mat mean = new Mat();
@@ -149,8 +141,7 @@ namespace Demo7
                 Cv2.BilateralFilter(gray, bilateral, 9, 75, 75);
                 //Cv2.ImShow("双边滤波", bilateral);
 
-                //组合去噪
-                //中值滤波
+                //中值滤波(组合去噪)钝化
                 Mat median = new Mat();
                 Cv2.MedianBlur(gray, median, 5);
                 //Cv2.ImShow("中值滤波", median);
@@ -160,25 +151,14 @@ namespace Demo7
                 Cv2.GaussianBlur(median, blurred, new OpenCvSharp.Size(7, 7), 2.0);
                 //Cv2.ImShow("高斯滤波", blurred);
 
-                Mat medianone = new Mat();
-                Cv2.MedianBlur(blurred, medianone, 3);
-                //Cv2.ImShow("中值滤波", medianone);
-
-                Mat blurredone = new Mat();
-                Cv2.GaussianBlur(medianone, blurredone, new OpenCvSharp.Size(7, 7), 2.0); ;
-                //Cv2.ImShow("高斯滤波", blurredone);
-
-                //锐化
-                //拉普拉斯算子
-                Console.WriteLine($"原图像图像类型: {gray.Type()}, 通道数: {gray.Channels()}");
+                //拉普拉斯算子 锐化
+                //Console.WriteLine($"原图像图像类型: {gray.Type()}, 通道数: {gray.Channels()}");
                 Mat laplacian = new Mat();
-                Cv2.Laplacian(blurredone, laplacian, MatType.CV_8U, 3);
+                Cv2.Laplacian(blurred, laplacian, MatType.CV_8U, 3);
                 //Cv2.ImShow("拉普拉斯算子", laplacian);
                 Mat res = new Mat();
-                Cv2.AddWeighted(blurredone, 1.0, laplacian, 1.0, 0, res);
+                Cv2.AddWeighted(blurred, 1.0, laplacian, 1.0, 0, res);
                 //Cv2.ImShow("res", res);
-
-
 
                 Mat io = new Mat();
                 Cv2.AdaptiveThreshold(blurred, io, 255,
@@ -187,20 +167,18 @@ namespace Demo7
                 21, 
                 3);
 
-                //test1 = ScharrMat(io);
-                //test2 = SobelMat(io);
-
-                //Cv2.ImShow("io",io);
+                Mat ip = new Mat();
+                Cv2.Threshold(blurred, ip, 50, 255, ThresholdTypes.BinaryInv);
 
                 //形态学闭运算
                 Mat closed = new Mat();
-                var kernelClose = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(7, 7));
-                Cv2.MorphologyEx(io, closed, MorphTypes.Close, kernelClose, null, iterations: 2);
+                var kernelClose = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(9, 9));
+                Cv2.MorphologyEx(blurred, closed, MorphTypes.Close, kernelClose, null, iterations: 2);
                 //Cv2.ImShow("closed", closed);
 
                 //形态学开运算
                 Mat opening = new Mat();
-                var kernelOpen = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
+                var kernelOpen = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(5, 5));
                 Cv2.MorphologyEx(closed, opening, MorphTypes.Open, kernelOpen, null, iterations: 1);
                 //Cv2.ImShow("opening", opening);
 
@@ -209,6 +187,8 @@ namespace Demo7
                 Cv2.MorphologyEx(opening, gradient, MorphTypes.Gradient, kernelOpen, null, iterations: 1);
                 //Cv2.ImShow("gradient", gradient);
 
+                //test1 = ScharrMat(opening);
+                test2 = SobelMat(opening);
 
                 // 二值化处理
                 Mat binary = new Mat();
@@ -283,10 +263,14 @@ namespace Demo7
                 Mat ko = new Mat();
 
 
+                string imagePath = @"C:\Users\Lenovo\Desktop\work\Test3\8.bmp";
+                string templatePath = @"C:\Users\Lenovo\Desktop\work\Test3\CNN\13.Png";
+                string outputPath = @"D:\test\result.jpg";
+
                 //图形匹配
-                IndustrialShapeMatcher.DetectByShapeMatching(imagePath, templatePath, outputPath);
+                //IndustrialShapeMatcher.DetectByShapeMatching(imagePath, templatePath, outputPath);
+
                 //特征点匹配
-                // 基本特征匹配
                 //FeatureMatcher.DetectByFeatureMatching(imagePath, templatePath, outputPath);
 
                 if (pictureBox1.Image != null)
@@ -329,6 +313,18 @@ namespace Demo7
                 }
             }
         }
+        public struct Point2D
+        {
+            public double X { get; set; }
+            public double Y { get; set; }
+            public Point2D(double x, double y)
+            {
+                X = x;
+                Y = y;
+            }
+        }
+        
+
         //匹配器(形状匹配)
         public class IndustrialShapeMatcher
         {
@@ -472,17 +468,20 @@ namespace Demo7
                 // 预处理源图像，得到二值图
                 Mat gray = new Mat();
                 Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+                Mat orign = new Mat();
+                orign = IncreaseBrightness(gray, 100);
                 Mat median = new Mat();
-                Cv2.MedianBlur(gray, median, 5);
+                Cv2.MedianBlur(orign, median, 5);
                 Mat thresh = new Mat();
                 Cv2.AdaptiveThreshold(median, thresh, 255,
                     AdaptiveThresholdTypes.GaussianC,
                     ThresholdTypes.BinaryInv, 25, 3);
-                Cv2.ImShow("初步处理", median);
+
+                Cv2.ImShow("图形特征中的中值滤波", thresh);
 
                 // 形态学修复
                 Mat morph = new Mat();
-                var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(7, 7));
+                var kernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(5, 5));
                 Cv2.MorphologyEx(thresh, morph, MorphTypes.Close, kernel, iterations: 2);
 
                 Cv2.ImShow("源图像预处理", morph);
