@@ -104,8 +104,6 @@ namespace Demo7
 
                 //Cv2.ImShow("原图加亮（增加100）",originalImage);
 
-
-
                 Mat test1 = new Mat();
                 Mat test2 = new Mat();
                 Mat test3 = new Mat();
@@ -273,6 +271,78 @@ namespace Demo7
                 //特征点匹配
                 //FeatureMatcher.DetectByFeatureMatching(imagePath, templatePath, outputPath);
 
+                //进行找圆
+                //List<Point2D> arcPoints = new List<Point2D>();
+
+                //// 模拟左半圆弧 (圆心在 100, 100, 半径 50)
+                //for (double angle = Math.PI * 0.6; angle <= Math.PI * 1.4; angle += 0.1)
+                //{
+                //    double x = 100 + 50 * Math.Cos(angle);
+                //    double y = 100 + 50 * Math.Sin(angle);
+                //    // 添加一点随机噪声模拟真实情况
+                //    arcPoints.Add(new Point2D(x + (new Random().NextDouble() - 0.5), y + (new Random().NextDouble() - 0.5)));
+                //}
+                //// 模拟右半圆弧
+
+                //for (double angle = Math.PI * 1.8; angle <= Math.PI * 2.4; angle += 0.1)
+                //{
+                //    double x = 100 + 50 * Math.Cos(angle);
+                //    double y = 100 + 50 * Math.Sin(angle);
+                //    arcPoints.Add(new Point2D(x + (new Random().NextDouble() - 0.5), y + (new Random().NextDouble() - 0.5)));
+                //}
+
+                //var detector = new IndustrialCircleDetector();
+
+                Point2f? center = DetectCircleFromMat(test2);
+
+                if (center.HasValue)
+                {
+                    Console.WriteLine($"找到圆心: X={center.Value.X}, Y={center.Value.Y}");
+
+                    Mat displayImage;
+                    if (test.Channels() == 1)
+                    {
+                        // 灰度图转BGR彩色图
+                        displayImage = new Mat();
+                        Cv2.CvtColor(test, displayImage, ColorConversionCodes.GRAY2BGR);
+                    }
+                    else
+                    {
+                        displayImage = test.Clone();
+                    }
+
+                    Cv2.Circle(displayImage,
+                       (int)center.Value.X, (int)center.Value.Y,
+                       5,                          // 半径5像素
+                       new Scalar(0, 0, 255),      // 红色 (BGR格式)
+                       -1);
+                    int crossSize = 15;
+                    Cv2.Line(displayImage,
+                             new Point((int)center.Value.X - crossSize, (int)center.Value.Y),
+                             new Point((int)center.Value.X + crossSize, (int)center.Value.Y),
+                             new Scalar(0, 255, 0), 2);    // 绿色横线
+
+                    Cv2.Line(displayImage,
+                             new Point((int)center.Value.X, (int)center.Value.Y - crossSize),
+                             new Point((int)center.Value.X, (int)center.Value.Y + crossSize),
+                             new Scalar(0, 255, 0), 2);    // 绿色竖线
+
+                    // 在圆心旁边显示坐标文字
+                    string text = $"Center: ({center.Value.X:F1}, {center.Value.Y:F1})";
+                    Cv2.PutText(displayImage, text,
+                                new Point((int)center.Value.X + 10, (int)center.Value.Y - 10),
+                                HersheyFonts.HersheySimplex, 0.6,
+                                new Scalar(255, 255, 255), 2);
+
+                    // 显示图像
+                    Cv2.ImShow("Detected Center", displayImage);
+                }
+                else
+                {
+                    Console.WriteLine("未找到圆心");
+                }
+
+
                 if (pictureBox1.Image != null)
                 {
                     pictureBox1.Image.Dispose();
@@ -313,6 +383,9 @@ namespace Demo7
                 }
             }
         }
+
+        //找出圆心
+        //分界线
         public struct Point2D
         {
             public double X { get; set; }
@@ -323,7 +396,454 @@ namespace Demo7
                 Y = y;
             }
         }
-        
+        //拟合结果结构
+        public struct CircleResult
+        {
+            public double CenterX { get; set; }
+            public double CenterY { get; set; }
+            public double Radius { get; set; }
+            public bool Success { get; set; }
+        }
+
+        public class CircleFitter
+        {
+            /// <summary>
+            /// 使用 Kåsa 方法 (最小二乘法) 拟合圆
+            /// </summary>
+            /// <param name="points">轮廓点集合 (至少需要3个点)</param>
+            /// <returns>包含圆心和半径的结果</returns>
+            public static CircleResult FitCircle(Point2D[] points)
+            {
+                if(points == null || points.Length < 3)
+                {
+                    return new CircleResult { Success = false };
+                }
+                int n  = points.Length;
+                double sumX = 0, sumY = 0;
+                double sumX2 = 0, sumY2 = 0;
+                double sumX3 = 0, sumY3 = 0;
+                double sumXY = 0, sumX2Y = 0, sumXY2 = 0;
+
+                foreach (var p in points)
+                {
+                    double x = p.X;
+                    double y = p.Y;
+                    double x2 = x * x;
+                    double y2 = y * y;
+
+
+                    sumX += x;
+                    sumY += y;
+                    sumX2 += x2;
+                    sumY2 += y2;
+                    sumX3 += x * x2;
+                    sumY3 += y * y2;
+                    sumXY += x * y;
+                    sumX2Y += x2 * y;
+                    sumXY2 += x * y2;
+                }
+
+                double A11 = sumX2;
+                double A12 = sumXY;
+                double A13 = sumX;
+                double B1 = -sumX3 - sumXY2;
+
+
+                double A21 = sumXY;
+                double A22 = sumY2;
+                double A23 = sumY;
+                double B2 = -sumX2Y - sumY3;
+
+
+                double A31 = sumX;
+                double A32 = sumY;
+                double A33 = n;
+                double B3 = -sumX2 - sumY2;
+
+                double detA = A11 * (A22 * A33 - A23 * A32)
+
+                        - A12 * (A21 * A33 - A23 * A31)
+
+                        + A13 * (A21 * A32 - A22 * A31);
+
+
+                if (Math.Abs(detA) < 1e-10)
+                {
+                    // 行列式接近0，点共线或分布不佳，无法拟合
+                    return new CircleResult { Success = false };
+
+                }
+
+                // 计算 D, E, F
+
+                double detD = B1 * (A22 * A33 - A23 * A32)
+                            - A12 * (B2 * A33 - A23 * B3)
+                            + A13 * (B2 * A32 - A22 * B3);
+
+
+                double detE = A11 * (B2 * A33 - A23 * B3)
+                            - B1 * (A21 * A33 - A23 * A31)
+                            + A13 * (A21 * B3 - B2 * A31);
+
+
+                double detF = A11 * (A22 * B3 - B2 * A32)
+                            - A12 * (A21 * B3 - B2 * A31)
+                            + B1 * (A21 * A32 - A22 * A31);
+
+
+                double D = detD / detA;
+                double E = detE / detA;
+                double F = detF / detA;
+
+                // 4. 计算圆心和半径
+                double centerX = -D / 2.0;
+                double centerY = -E / 2.0;
+
+                double radiusSquared = (D * D + E * E) / 4.0 - F;
+
+                if (radiusSquared < 0)
+                {
+                    // 数值误差导致半径平方为负，设为0或视为失败
+                    radiusSquared = 0;
+                }
+                double radius = Math.Sqrt(radiusSquared);
+
+                return new CircleResult
+                {
+                    CenterX = centerX,
+                    CenterY = centerY,
+                    Radius = radius,
+                    Success = true
+
+                };
+            }
+        }
+
+        //分界线
+        public Point2f? DetectCircleFromMat(Mat image)
+        {
+            // 1. 确保图像不为空
+            if (image == null || image.Empty())
+                return null;
+
+            // 2. 如果图像不是二值图，先进行二值化
+            Mat binaryImage;
+            if (image.Channels() > 1)
+            {
+                // 彩色图转灰度
+                Mat gray = new Mat();
+                Cv2.CvtColor(image, gray, ColorConversionCodes.BGR2GRAY);
+                binaryImage = new Mat();
+                Cv2.Threshold(gray, binaryImage, 127, 255, ThresholdTypes.Binary);
+                gray.Dispose();
+            }
+            else
+            {
+                // 已经是灰度图或二值图
+                binaryImage = image.Clone();
+                // 如果不是二值图，进行二值化
+                if (!IsBinaryImage(binaryImage))
+                {
+                    Cv2.Threshold(binaryImage, binaryImage, 127, 255, ThresholdTypes.Binary);
+                }
+            }
+
+            // 3. 查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(binaryImage, out contours, out hierarchy,
+                RetrievalModes.List, ContourApproximationModes.ApproxSimple);
+
+            //在原图上绘制轮廓
+            Mat result = binaryImage.Clone();
+            Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
+
+            for (int i = 0; i < contours.Length; i++)
+            {
+                // 可以过滤太小的轮廓（根据面积）
+                double area = Cv2.ContourArea(contours[i]);
+                if (area > 100) // 只绘制面积大于100的轮廓
+                {
+                    // 随机颜色或固定颜色
+                    Scalar color = new Scalar(0, 255, 0); // 绿色
+                    Cv2.DrawContours(result, contours, i, color, 2);
+
+                    // 或者绘制轮廓的外接矩形
+                    Rect boundingRect = Cv2.BoundingRect(contours[i]);
+                    //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
+                }
+            }
+
+            //Cv2.ImShow("kkok", result);
+
+            if (contours == null || contours.Length == 0)
+            {
+                binaryImage.Dispose();
+                return null;
+            }
+
+            // 4. 过滤轮廓（去除太小或太大的）
+            var filteredContours = FilterContours(contours, binaryImage);
+
+            if (filteredContours.Length == 0)
+            {
+                binaryImage.Dispose();
+                return null;
+            }
+
+            // 5. 提取所有轮廓点作为点集
+            Point2f[] allPoints = ExtractAllPoints(filteredContours);
+
+            // 6. 使用RANSAC拟合圆
+            var ransac = new RansacCircleDetector();
+            var circle = ransac.FitCircleRansac(allPoints, iterations: 1000, distanceThreshold: 3.0f);
+
+            binaryImage.Dispose();
+
+            return circle?.Center;
+        }
+
+        /// <summary>
+        /// 确认圆的位置
+        /// </summary>
+        public Point2f? DetectCircleWithVisualization(Mat image, out Mat resultImage)
+        {
+            resultImage = image.Clone();
+
+            // 转换为彩色图以便绘制
+            if (resultImage.Channels() == 1)
+            {
+                Cv2.CvtColor(resultImage, resultImage, ColorConversionCodes.GRAY2BGR);
+            }
+
+            // 1. 确保图像不为空
+            if (image == null || image.Empty())
+                return null;
+
+            // 2. 预处理：二值化
+            Mat binaryImage;
+            if (image.Channels() > 1)
+            {
+                Mat gray = new Mat();
+                Cv2.CvtColor(image, gray, ColorConversionCodes.BGR2GRAY);
+                binaryImage = new Mat();
+                Cv2.Threshold(gray, binaryImage, 127, 255, ThresholdTypes.Binary);
+                gray.Dispose();
+            }
+            else
+            {
+                binaryImage = image.Clone();
+                if (!IsBinaryImage(binaryImage))
+                {
+                    Cv2.Threshold(binaryImage, binaryImage, 127, 255, ThresholdTypes.Binary);
+                }
+            }
+
+            // 3. 查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(binaryImage, out contours, out hierarchy,
+                RetrievalModes.List, ContourApproximationModes.ApproxSimple);
+
+            if (contours == null || contours.Length == 0)
+            {
+                binaryImage.Dispose();
+                return null;
+            }
+
+            // 4. 过滤轮廓并绘制
+            var filteredContours = FilterContours(contours, binaryImage);
+
+            // 在原图上绘制所有轮廓（绿色）
+            Cv2.DrawContours(resultImage, filteredContours, -1, new Scalar(0, 255, 0), 2);
+
+            // 5. 提取所有轮廓点
+            Point2f[] allPoints = ExtractAllPoints(filteredContours);
+
+            // 6. 使用RANSAC拟合圆
+            var ransac = new RansacCircleDetector();
+            var circle = ransac.FitCircleRansac(allPoints, iterations: 1000, distanceThreshold: 3.0f);
+
+            if (circle.HasValue)
+            {
+                // 绘制拟合的圆（红色）
+                Cv2.Circle(resultImage, (int)circle.Value.Center.X, (int)circle.Value.Center.Y,
+                          (int)circle.Value.Radius, new Scalar(0, 0, 255), 2);
+
+                // 绘制圆心（蓝色）
+                Cv2.Circle(resultImage, (int)circle.Value.Center.X, (int)circle.Value.Center.Y,
+                          5, new Scalar(255, 0, 0), -1);
+
+                // 在图像上显示圆心坐标
+                string text = $"Center: ({circle.Value.Center.X:F1}, {circle.Value.Center.Y:F1})";
+                Cv2.PutText(resultImage, text, new Point(10, 30),
+                           HersheyFonts.HersheySimplex, 0.8, new Scalar(255, 255, 255), 2);
+            }
+
+            binaryImage.Dispose();
+
+            return circle?.Center;
+        }
+
+        public class RansacCircleDetector
+        {
+            /// <summary>
+            /// 使用RANSAC算法拟合圆，适合有噪声的情况
+            /// </summary>
+            public CircleSegment? FitCircleRansac(Point2f[] points, int iterations = 1000, float distanceThreshold = 5.0f)
+            {
+                if (points.Length < 3) return null;
+
+                CircleSegment? bestCircle = null;
+                int bestInlierCount = 0;
+
+                Random rand = new Random();
+
+                for (int i = 0; i < iterations; i++)
+                {
+                    // 随机选择3个点
+                    int idx1 = rand.Next(points.Length);
+                    int idx2 = rand.Next(points.Length);
+                    int idx3 = rand.Next(points.Length);
+
+                    if (idx1 == idx2 || idx2 == idx3 || idx1 == idx3)
+                        continue;
+
+                    // 计算这3个点确定的圆
+                    var circle = GetCircleFromThreePoints(points[idx1], points[idx2], points[idx3]);
+                    if (!circle.HasValue) continue;
+
+                    // 计算内点数量
+                    int inlierCount = 0;
+                    foreach (var point in points)
+                    {
+                        float distance = Math.Abs(GetDistanceToCircle(point, circle.Value));
+                        if (distance <= distanceThreshold)
+                            inlierCount++;
+                    }
+
+                    // 更新最佳结果
+                    if (inlierCount > bestInlierCount)
+                    {
+                        bestInlierCount = inlierCount;
+                        bestCircle = (CircleSegment)circle;
+                    }
+                }
+
+                // 如果有足够多的内点，用所有内点重新拟合更精确的圆
+                if (bestCircle.HasValue && bestInlierCount > points.Length * 0.5)
+                {
+                    var inliers = new List<Point2f>();
+                    foreach (var point in points)
+                    {
+                        if (Math.Abs(GetDistanceToCircle(point, bestCircle.Value)) <= distanceThreshold)
+                            inliers.Add(point);
+                    }
+
+                    if (inliers.Count >= 3)
+                    {
+                        // 用所有内点重新拟合
+                        Point2f refinedCenter;
+                        float refinedRadius;
+                        Cv2.MinEnclosingCircle(inliers, out refinedCenter, out refinedRadius);
+                        return new CircleSegment(refinedCenter, refinedRadius);
+                    }
+                }
+
+                return bestCircle;
+            }
+
+            private CircleSegment? GetCircleFromThreePoints(Point2f p1, Point2f p2, Point2f p3)
+            {
+                // 计算两线段的中垂线交点
+                float ma = (p2.Y - p1.Y) / (p2.X - p1.X);
+                float mb = (p3.Y - p2.Y) / (p3.X - p2.X);
+
+                // 处理垂直线的情况
+                if (Math.Abs(ma - mb) < 1e-6) return null;
+
+                float centerX = (ma * mb * (p1.Y - p3.Y) + mb * (p1.X + p2.X) - ma * (p2.X + p3.X)) / (2 * (mb - ma));
+                float centerY = -1 / ma * (centerX - (p1.X + p2.X) / 2) + (p1.Y + p2.Y) / 2;
+
+                float radius = (float)Math.Sqrt(Math.Pow(p1.X - centerX, 2) + Math.Pow(p1.Y - centerY, 2));
+
+                return new CircleSegment(new Point2f(centerX, centerY), radius);
+            }
+
+            private float GetDistanceToCircle(Point2f point, CircleSegment circle)
+            {
+                float dx = point.X - circle.Center.X;
+                float dy = point.Y - circle.Center.Y;
+                return (float)Math.Sqrt(dx * dx + dy * dy) - circle.Radius;
+            }
+        }
+
+        public struct CircleSegment
+        {
+            public Point2f Center { get; }
+            public float Radius { get; }
+
+            public CircleSegment(Point2f center, float radius)
+            {
+                Center = center;
+                Radius = radius;
+            }
+        }
+
+        private Point[][] FilterContours(Point[][] contours, Mat referenceImage)
+        {
+            double imageArea = referenceImage.Width * referenceImage.Height;
+            double minArea = imageArea * 0.001;  // 最小面积为图像面积的1%
+            double maxArea = imageArea * 0.8;   // 最大面积为图像面积的80%
+
+            var filtered = new List<Point[]>();
+
+            foreach (var contour in contours)
+            {
+                double area = Cv2.ContourArea(contour);
+                if (area >= minArea && area <= maxArea && contour.Length > 10)
+                {
+                    filtered.Add(contour);
+                }
+            }
+
+            return filtered.ToArray();
+        }
+
+        /// <summary>
+        /// 从轮廓中提取所有点
+        /// </summary>
+        private Point2f[] ExtractAllPoints(Point[][] contours)
+        {
+            var points = new List<Point2f>();
+
+            foreach (var contour in contours)
+            {
+                foreach (var point in contour)
+                {
+                    points.Add(new Point2f(point.X, point.Y));
+                }
+            }
+
+            return points.ToArray();
+        }
+
+        /// <summary>
+        /// 判断图像是否为二值图
+        /// </summary>
+        private bool IsBinaryImage(Mat image)
+        {
+            // 简单判断：检查像素值是否只有0和255
+            if (image.Channels() != 1) return false;
+
+            double minVal, maxVal;
+            Cv2.MinMaxIdx(image, out minVal, out maxVal);
+
+            // 如果最小值和最大值分别是0和255，可能是二值图
+            // 但这不是绝对的，这里简化处理
+            return (minVal == 0 && maxVal == 255);
+        }
+
 
         //匹配器(形状匹配)
         public class IndustrialShapeMatcher
@@ -674,7 +1194,6 @@ namespace Demo7
 
                 return sharp.Clone();
             }
-
             /// <summary>
             /// FLANN快速近邻匹配
             /// </summary>
@@ -716,7 +1235,6 @@ namespace Demo7
 
                 return goodMatches.ToArray();
             }
-
             /// <summary>
             /// 进一步筛选优质匹配点
             /// </summary>
@@ -731,7 +1249,6 @@ namespace Demo7
                 int takeCount = Math.Max(10, (int)(sorted.Length * 0.3));
                 return sorted.Take(takeCount).ToArray();
             }
-
             /// <summary>
             /// 计算单应性矩阵
             /// </summary>
@@ -864,28 +1381,28 @@ namespace Demo7
                 return new Rect(x, y, width, height);
             }
             private static Point DetectHookInROI(Mat roi)
-        {
-            // 这里可以添加专门的钩子检测逻辑
-            // 例如：霍夫直线检测、轮廓分析等
+            {
+                // 这里可以添加专门的钩子检测逻辑
+                // 例如：霍夫直线检测、轮廓分析等
 
-            // 简单示例：找最突出的凸起
-            Mat gray = new Mat();
-            Cv2.CvtColor(roi, gray, ColorConversionCodes.BGR2GRAY);
-                Mat edges = new Mat();
-            Cv2.Canny(gray, edges, 50, 150);
+                // 简单示例：找最突出的凸起
+                Mat gray = new Mat();
+                Cv2.CvtColor(roi, gray, ColorConversionCodes.BGR2GRAY);
+                    Mat edges = new Mat();
+                Cv2.Canny(gray, edges, 50, 150);
 
-            Cv2.FindContours(edges, out Point[][] contours, out _, 
-                RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+                Cv2.FindContours(edges, out Point[][] contours, out _, 
+                    RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
-            //if (contours.Length == 0) return Point.Empty;
+                //if (contours.Length == 0) return Point.Empty;
 
-            // 找最长的轮廓（可能是钩子）
-            var longest = contours.OrderByDescending(c => Cv2.ArcLength(c, false)).First();
+                // 找最长的轮廓（可能是钩子）
+                var longest = contours.OrderByDescending(c => Cv2.ArcLength(c, false)).First();
 
-            // 返回轮廓中心
-            var rect = Cv2.BoundingRect(longest);
-            return new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
-        }
+                // 返回轮廓中心
+                var rect = Cv2.BoundingRect(longest);
+                return new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+            }
 
 
 
@@ -918,72 +1435,6 @@ namespace Demo7
             Cv2.ImShow("角点检测后的二值效果图：", harrisConrner);
 
             return harrisConrner;
-        }
-
-        //霍夫曼画圆
-        public Mat HoughCircles(Mat image)
-        {
-            //只收灰度图
-            Mat src = new Mat();
-            src = image.Clone();
-
-            Mat gray = new Mat();
-
-            if (src.Channels() == 3)
-            {
-                Console.WriteLine("将3通道彩色图转换为灰度图");
-                Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
-            }
-            if (src.Channels() == 4)
-            {
-                Console.WriteLine("将4通道图转换为灰度图");
-                Cv2.CvtColor(src, gray, ColorConversionCodes.BGRA2GRAY);
-            }
-            else if (src.Channels() == 1)
-            {
-                Console.WriteLine("图像已经是灰度图");
-                gray = src.Clone();
-            }
-
-
-            CircleSegment[] circles = Cv2.HoughCircles(gray, HoughModes.Gradient, 1, 30, 100, 30, 5, 50);
-
-            Mat op = new Mat();
-            op = src.Clone();
-
-            // 如果检测到圆
-            if (circles.Length > 0)
-            {
-                Console.WriteLine($"检测到 {circles.Length} 个圆");
-
-                foreach (CircleSegment circle in circles)
-                {
-                    Point2f center = circle.Center;
-                    float radius = circle.Radius;
-
-                    if (radius > 5)
-                    {
-                        Console.WriteLine($"找到一个圆，圆心在 ({center.X:F2}, {center.Y:F2})，半径为 {radius:F2}");
-
-                        // 绘制圆心（红色圆点）
-                        Cv2.Circle(op, (int)center.X, (int)center.Y, 3, new Scalar(0, 0, 255), -1);
-
-                        // 绘制圆轮廓（绿色）
-                        Cv2.Circle(op, (int)center.X, (int)center.Y, (int)radius, new Scalar(0, 255, 0), 2);
-                    }
-                    else
-                    {
-                        Console.WriteLine($"跳过半径过小的圆: 半径 {radius:F2} <= 5");
-                    }
-                }
-            }
-            else
-            {
-                Console.WriteLine("未检测到圆");
-            }
-            Cv2.ImShow("检测的圆", op);
-
-            return image;
         }
 
         //调用Sobel函数
