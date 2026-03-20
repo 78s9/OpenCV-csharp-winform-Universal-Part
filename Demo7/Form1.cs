@@ -5,6 +5,9 @@ using System.IO;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Security.Cryptography;
+using System.Diagnostics;
+using System.Linq;
+using System.Windows.Forms.VisualStyles;
 
 namespace Demo7
 {
@@ -71,7 +74,6 @@ namespace Demo7
             image.ConvertTo(result, MatType.CV_8UC3, 1.0, brightnessValue);
             return result;
         }
-
         //下拉选择
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -90,10 +92,12 @@ namespace Demo7
                 string fullPath = Path.Combine(_currentDirectory, seletedFile);
                 Mat test = new Mat();
                 test = LoadAndResizeImage(fullPath);
+
+                Console.WriteLine($"原图像图像类型: {test.Type()}, 通道数: {test.Channels()}");
                 //Cv2.ImShow("原图", test1);
                 Mat originalImage =new Mat();
-                originalImage = IncreaseBrightness(test, 115);
-                //Cv2.ImShow("原图加亮（增加115）",originalImage);
+                originalImage = IncreaseBrightness(test, 100);
+                //Cv2.ImShow("原图加亮（增加10）",originalImage);
 
                 Mat test1 = new Mat();
                 Mat test2 = new Mat();
@@ -103,6 +107,8 @@ namespace Demo7
                 test1 = ScharrMat(originalImage);
                 test2 = SobelMat(originalImage);
                 //test3 = CornerHarrisone(originalImage);
+
+                //test4 = HoughCircles(test1);
 
                 // 灰度转换
                 Mat gray = new Mat();
@@ -121,7 +127,7 @@ namespace Demo7
                 //Cv2.ImShow("gray",gray);
 
                 //霍夫曼画圆需要输入灰度图
-                test4 = HoughCircles(gray);
+                //test4 = HoughCircles(gray);
 
                 // 高斯模糊
                 Mat blurred = new Mat();
@@ -134,8 +140,8 @@ namespace Demo7
                  //Cv2.ImShow("binary", binary);
 
                 // 反转二值图像
-                Mat dst = new Mat();
-                Cv2.BitwiseNot(binary, dst);
+                //Mat dst = new Mat();
+                //Cv2.BitwiseNot(binary, dst);
                 //Cv2.ImShow("dst", dst);
 
                 //创建结构元素（核）
@@ -143,18 +149,20 @@ namespace Demo7
                 Mat kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(3, 3));
                 // 创建不同形状的核
                 Mat rectKernel = Cv2.GetStructuringElement(MorphShapes.Rect, new OpenCvSharp.Size(5, 5));            //按照矩形进行膨胀、侵蚀，适合去除大噪声
-                Mat ellipseKernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(5, 5));      //按照圆来进行膨胀、侵蚀，适合保留形状
+                Mat ellipseKernel = Cv2.GetStructuringElement(MorphShapes.Ellipse, new OpenCvSharp.Size(3, 3));      //按照圆来进行膨胀、侵蚀，适合保留形状
                 Mat crossKernel = Cv2.GetStructuringElement(MorphShapes.Cross, new OpenCvSharp.Size(5, 5));          //按照十字进行膨胀、侵蚀，适合保留笔画特征
 
-                //膨胀
                 Mat dilated = new Mat();
                 Mat a = new Mat();
                 Mat Imag = new Mat();
 
-                Cv2.Dilate(test, Imag, ellipseKernel);
-                Cv2.Dilate(binary, dilated, kernel);
+                //膨胀
+                Cv2.Dilate(binary, Imag, ellipseKernel);
+                //Cv2.Dilate(binary, dilated, kernel);
+                Cv2.MorphologyEx(binary, a, MorphTypes.Close, ellipseKernel);
                 //Cv2.ImShow("膨胀1", dilated1);
-                //Cv2.ImShow("膨胀2", Imag);
+                Cv2.ImShow("膨胀2", Imag);
+                //Cv2.ImShow("a", a);
 
                 //侵蚀
                 Mat eroded1 = new Mat();
@@ -196,6 +204,9 @@ namespace Demo7
                 }
 
                 //Cv2.ImShow("用轮廓检测结果", result);
+                Mat ko = new Mat();
+                ko = TemplateBasedCircleDetector(result);
+
 
                 if (pictureBox1.Image != null)
                 {
@@ -235,9 +246,192 @@ namespace Demo7
                 {
                     MessageBox.Show($"加载图片失败：{ex.Message}","错误");
                 }
-
             }
         }
+
+        public class CircleInfo
+        {
+            public Point2f Center { get; set; }
+            public float Radius { get; set; }
+            public double Area { get; set; }
+            public double Circularity { get; set; }
+            public double MatchScore { get; set; }
+        }
+        //样板匹配
+        public Mat TemplateBasedCircleDetector(Mat image)
+        {
+            Mat templateImage = new Mat();
+            templateImage = Cv2.ImRead("C:\\Users\\Lenovo\\Desktop\\work\\Test3\\CNN\\15.Png");
+            Mat op = new Mat();
+            op = image;
+            // 分析样板特征
+            AnalyzeTemplate(templateImage);
+
+            //Mat lp = new Mat();
+            //lp = ScharrMat(op);
+            //Cv2.ImShow("lp", lp);
+            //Mat kk = new Mat();
+            //DatectCircles(lp);
+
+            return image;
+        }
+        //分析样板图
+        public Mat AnalyzeTemplate(Mat templateImage)
+        {
+            Mat image = new Mat();
+            image = templateImage.Clone();
+            Mat gray = new Mat();
+            if (image.Channels() == 3)
+                Cv2.CvtColor(templateImage, gray, ColorConversionCodes.BGR2GRAY);
+            else
+                gray = image.Clone();
+
+            Mat grad_x = new Mat();
+            Mat grad_y = new Mat();
+            Mat abs_grad_x = new Mat();
+            Mat abs_grad_y = new Mat();
+            Mat dst = new Mat();
+
+            //用scharr函数求X方向梯度
+            Cv2.Scharr(gray, grad_x, MatType.CV_16S, 1, 0, 1, 0, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
+
+            //用scharr函数求X方向梯度
+            Cv2.Scharr(gray, grad_y, MatType.CV_16S, 0, 1, 1, 0, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_y, abs_grad_y);
+
+            //合并梯度
+            Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, dst);
+
+            Mat binary = new Mat();
+            Cv2.Threshold(gray, binary, thresholdValue, maxValue, ThresholdTypes.Otsu);
+
+            //查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(binary, out contours, out hierarchy, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+            if (contours.Length > 0)
+            {
+
+                var largestContour = contours.OrderByDescending(c => Cv2.ContourArea(c)).First();
+                double templateArea = 0.0;
+                double templateCircularity = 0.0;
+                double templateRadius = 0.0;
+
+                //计算特征
+                templateArea = Cv2.ContourArea(largestContour);
+                double perimeter = Cv2.ArcLength(largestContour, true);
+                templateCircularity = 4 * Math.PI * templateArea / (perimeter * perimeter);
+
+                Point2f center;
+                float radius;
+                Cv2.MinEnclosingCircle(largestContour, out center, out radius);
+                templateRadius = radius;
+
+                //保存边缘图用于匹配
+                Mat templateEdges = new Mat();
+                Cv2.Canny(templateImage, templateEdges, 50, 150);
+
+                Console.WriteLine($"样板分析完成:");
+                Console.WriteLine($"  半径: {templateRadius:F2}");
+                Console.WriteLine($"  面积: {templateArea:F2}");
+                Console.WriteLine($"  圆度: {templateCircularity:F3}");
+
+            }
+            gray.Dispose();
+            binary.Dispose();
+            return image;
+
+        }
+        //对比
+        public List<CircleInfo> DatectCircles(
+            Mat testImage,
+            double areaTolerance = 0.3,      // 面积容差 ±30%
+            double circularityTolerance = 0.1, // 圆度容差
+            double radiusTolerance = 0.2)
+        {
+            double templateArea = 0.0;
+            double templateCircularity = 0.0;
+            double templateRadius = 0.0;
+
+            List<CircleInfo> detectedCircles = new List<CircleInfo>();
+
+            // 1. 预处理测试图像
+            Mat gray = new Mat();
+            if (testImage.Channels() == 3)
+                Cv2.CvtColor(testImage, gray, ColorConversionCodes.BGR2GRAY);
+            else
+                gray = testImage.Clone();
+
+            // 2. 边缘检测
+            Mat edges = new Mat();
+            Cv2.Canny(gray, edges, 50, 150);
+
+            // 3. 查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(edges, out contours, out hierarchy,
+                RetrievalModes.List, ContourApproximationModes.ApproxSimple);
+
+            // 4. 遍历轮廓，与样板特征对比
+            foreach (var contour in contours)
+            {
+                double area = Cv2.ContourArea(contour);
+                double perimeter = Cv2.ArcLength(contour, true);
+                double circularity = 4 * Math.PI * area / (perimeter * perimeter);
+
+                // 基于样板的筛选
+                bool areaMatch = Math.Abs(area - templateArea) / templateArea <= areaTolerance;
+                bool circularityMatch = Math.Abs(circularity - templateCircularity) <= circularityTolerance;
+
+                if (areaMatch && circularityMatch)
+                {
+                    // 拟合圆
+                    Point2f center;
+                    float radius;
+                    Cv2.MinEnclosingCircle(contour, out center, out radius);
+
+                    // 半径检查
+                    if (Math.Abs(radius - templateRadius) / templateRadius <= radiusTolerance)
+                    {
+                        detectedCircles.Add(new CircleInfo
+                        {
+                            Center = center,
+                            Radius = radius,
+                            Area = area,
+                            Circularity = circularity,
+                            MatchScore = CalculateMatchScore(area, circularity, radius)
+                        });
+                        Console.WriteLine($"[找到圆] 中心: ({center.X:F2}, {center.Y:F2}), " +
+                        $"半径: {radius:F2}, 面积: {area:F2}, " +
+                        $"圆度: {circularity:F3}, 匹配度: ");
+                    }
+                }
+                Console.WriteLine("未找到");
+            }
+
+            gray.Dispose();
+            edges.Dispose();
+
+            return detectedCircles;
+
+
+        }
+        public double CalculateMatchScore(double area, double circularity, float radius)
+        {
+            double templateArea = 0.0;
+            double templateCircularity = 0.0;
+            double templateRadius = 0.0;
+            // 计算综合匹配度（0-1之间，越高越匹配）
+            double areaScore = 1 - Math.Abs(area - templateArea) / templateArea;
+            double circScore = 1 - Math.Abs(circularity - templateCircularity);
+            double radiusScore = 1 - Math.Abs(radius - templateRadius) / templateRadius;
+
+            // 加权平均
+            return areaScore * 0.3 + circScore * 0.3 + radiusScore * 0.4;
+        }
+
 
         //用harris角点检测找出角点
         public Mat CornerHarrisone(Mat image)
@@ -265,7 +459,7 @@ namespace Demo7
             Cv2.Threshold(cornerStrength, harrisConrner, 0.00001, 255, ThresholdTypes.Binary);
             Cv2.ImShow("角点检测后的二值效果图：", harrisConrner);
 
-            return src;
+            return harrisConrner;
         }
 
         //霍夫曼画圆
@@ -275,27 +469,63 @@ namespace Demo7
             Mat src = new Mat();
             src = image.Clone();
 
-            CircleSegment[] circles = Cv2.HoughCircles(src, HoughModes.Gradient, 1, 30, 100, 30, 5, 50);
+            Mat gray = new Mat();
+
+            if (src.Channels() == 3)
+            {
+                Console.WriteLine("将3通道彩色图转换为灰度图");
+                Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+            }
+            if (src.Channels() == 4)
+            {
+                Console.WriteLine("将4通道图转换为灰度图");
+                Cv2.CvtColor(src, gray, ColorConversionCodes.BGRA2GRAY);
+            }
+            else if (src.Channels() == 1)
+            {
+                Console.WriteLine("图像已经是灰度图");
+                gray = src.Clone();
+            }
+
+
+            CircleSegment[] circles = Cv2.HoughCircles(gray, HoughModes.Gradient, 1, 30, 100, 30, 5, 50);
 
             Mat op = new Mat();
-            Cv2.CvtColor(src, op, ColorConversionCodes.GRAY2BGR);
-            foreach (CircleSegment circle in circles)
+            op = src.Clone();
+
+            // 如果检测到圆
+            if (circles.Length > 0)
             {
-                // 直接从这里获取圆心坐标
-                Point2f center = circle.Center;
-                float radius = circle.Radius;
+                Console.WriteLine($"检测到 {circles.Length} 个圆");
 
-                Console.WriteLine($"找到一个圆，圆心在 ({center.X}, {center.Y})，半径为 {radius}");
+                foreach (CircleSegment circle in circles)
+                {
+                    Point2f center = circle.Center;
+                    float radius = circle.Radius;
 
-                // 在新图像上绘制圆心（红色）
-                Cv2.Circle(op, (int)center.X, (int)center.Y, 1, new Scalar(0, 0, 255), 2);
+                    if (radius > 5)
+                    {
+                        Console.WriteLine($"找到一个圆，圆心在 ({center.X:F2}, {center.Y:F2})，半径为 {radius:F2}");
 
-                // 可选：绘制圆轮廓（绿色）
-                Cv2.Circle(op, (int)center.X, (int)center.Y, (int)radius, new Scalar(0, 255, 0), 2);
+                        // 绘制圆心（红色圆点）
+                        Cv2.Circle(op, (int)center.X, (int)center.Y, 3, new Scalar(0, 0, 255), -1);
+
+                        // 绘制圆轮廓（绿色）
+                        Cv2.Circle(op, (int)center.X, (int)center.Y, (int)radius, new Scalar(0, 255, 0), 2);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"跳过半径过小的圆: 半径 {radius:F2} <= 5");
+                    }
+                }
             }
-            //Cv2.ImShow("检测的圆", op);
+            else
+            {
+                Console.WriteLine("未检测到圆");
+            }
+            Cv2.ImShow("检测的圆", op);
 
-            return src;
+            return image;
         }
 
         //调用Sobel函数
@@ -308,7 +538,7 @@ namespace Demo7
             Mat abs_grad_y = new Mat();
             Mat dst = new Mat();
 
-            //使用Sobel方法
+            //使用Sobel
             Cv2.Sobel(scr, grad_x, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
             Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
             //Cv2.ImShow("X方向sobel",abs_grad_x);
@@ -379,7 +609,7 @@ namespace Demo7
 
             Cv2.ImShow("用Sobel轮廓检测结果", result);
 
-            return scr;
+            return result;
         }
 
         //调用Scharr函数
@@ -438,7 +668,8 @@ namespace Demo7
 
             //二值化
             Mat binary = new Mat();
-            Cv2.Threshold(gray, binary, thresholdValue, maxValue, ThresholdTypes.Otsu);
+            //Cv2.Threshold(gray, binary, thresholdValue, maxValue, ThresholdTypes.Otsu);
+            Cv2.Threshold(gray, binary, thresholdValue, maxValue, ThresholdTypes.BinaryInv);
             //Console.WriteLine($"二值化后图像类型: {binary.Type()}, 通道数: {binary.Channels()}");
 
             //查找轮廓
@@ -466,9 +697,9 @@ namespace Demo7
                 }
             }
 
-            //Cv2.ImShow("用Soharr轮廓检测结果", result);
+            Cv2.ImShow("用Soharr轮廓检测结果", result);
 
-            return src;
+            return result;
         }
 
         //分界线
