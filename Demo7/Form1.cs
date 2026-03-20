@@ -24,14 +24,12 @@ namespace Demo7
             _currentDirectory = "C:\\Users\\Lenovo\\Desktop\\work\\Test3";
             LoadFiles(_currentDirectory);
         }
-
         private void button1_Click(object sender, EventArgs e)
         {
             // 从文本框获取阈值参数
             thresholdValue = int.Parse(textBox1.Text); 
             maxValue = int.Parse(textBox2.Text);
         }
-
         //读取文件
         private void LoadFiles(string folderPath)
         {
@@ -93,21 +91,25 @@ namespace Demo7
                 Mat test = new Mat();
                 test = LoadAndResizeImage(fullPath);
 
-                Console.WriteLine($"原图像图像类型: {test.Type()}, 通道数: {test.Channels()}");
+                //Console.WriteLine($"原图像图像类型: {test.Type()}, 通道数: {test.Channels()}");
+
                 //Cv2.ImShow("原图", test1);
+
                 Mat originalImage =new Mat();
                 originalImage = IncreaseBrightness(test, 100);
-                //Cv2.ImShow("原图加亮（增加10）",originalImage);
+
+                //Cv2.ImShow("原图加亮（增加100）",originalImage);
+
+
 
                 Mat test1 = new Mat();
                 Mat test2 = new Mat();
                 Mat test3 = new Mat();
                 Mat test4 = new Mat();
 
-                test1 = ScharrMat(originalImage);
-                test2 = SobelMat(originalImage);
+                //test1 = ScharrMat(originalImage);
+                //test2 = SobelMat(originalImage);
                 //test3 = CornerHarrisone(originalImage);
-
                 //test4 = HoughCircles(test1);
 
                 // 灰度转换
@@ -129,10 +131,40 @@ namespace Demo7
                 //霍夫曼画圆需要输入灰度图
                 //test4 = HoughCircles(gray);
 
+                //均值滤波
+                Mat mean = new Mat();
+                Cv2.Blur(gray, mean, new OpenCvSharp.Size(5, 5));
+                Cv2.ImShow("均值滤波", mean);
+
+                //中值滤波
+                Mat median = new Mat();
+                Cv2.MedianBlur(gray, median, 1);
+                Cv2.ImShow("中值滤波",median);
+                
+
+                //双边滤波
+                Mat bilateral = new Mat();
+                Cv2.BilateralFilter(gray, bilateral, 9, 75, 75);
+                Cv2.ImShow("双边滤波", bilateral);
+
                 // 高斯模糊
                 Mat blurred = new Mat();
                 Cv2.GaussianBlur(gray, blurred, new OpenCvSharp.Size(7, 7), 2.0);
                 //Cv2.ImShow("blurred", blurred);
+
+                //锐化
+                //拉普拉斯算子
+                Console.WriteLine($"原图像图像类型: {gray.Type()}, 通道数: {gray.Channels()}");
+                Mat laplacian = new Mat();
+                Cv2.Laplacian(mean, laplacian, MatType.CV_8U, 3);
+                //Cv2.ImShow("laplacian", laplacian);
+                Mat res = new Mat();
+                Cv2.AddWeighted(mean, 1.0, laplacian, 1.0, 0, res);
+                Cv2.ImShow("res", res);
+
+                test1 = ScharrMat(res);
+
+
 
                 // 二值化处理
                 Mat binary = new Mat();
@@ -161,7 +193,7 @@ namespace Demo7
                 //Cv2.Dilate(binary, dilated, kernel);
                 Cv2.MorphologyEx(binary, a, MorphTypes.Close, ellipseKernel);
                 //Cv2.ImShow("膨胀1", dilated1);
-                Cv2.ImShow("膨胀2", Imag);
+                //Cv2.ImShow("膨胀2", Imag);
                 //Cv2.ImShow("a", a);
 
                 //侵蚀
@@ -756,6 +788,10 @@ namespace Demo7
 
         }
 
-
+        private void button2_Click(object sender, EventArgs e)
+        {
+            Form2 form2 = new Form2();
+            form2.ShowDialog();
+        }
     }
 }
