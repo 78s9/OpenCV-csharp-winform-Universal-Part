@@ -109,7 +109,7 @@ namespace Demo7
                 Mat test3 = new Mat();
                 Mat test4 = new Mat();
 
-                test1 = ScharrMat(originalImage);
+                //test1 = ScharrMat(originalImage);
                 //test2 = SobelMat(originalImage);
                 //test3 = CornerHarrisone(originalImage);
                 //test4 = HoughCircles(test1);
@@ -232,64 +232,9 @@ namespace Demo7
                 Cv2.Canny(binary, edges, 50, 150);
                 //Cv2.ImShow("edges",edges);
 
-                Cv2.FindContours(edges, out OpenCvSharp.Point[][] contours, out HierarchyIndex[] hierarchy,
-                 RetrievalModes.External, ContourApproximationModes.ApproxSimple);
-
-                //Console.WriteLine($"找到 {contours.Length} 个轮廓");
-
-                //在原图上绘制轮廓
-                Mat result = binary.Clone();
-                Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
-
-                for (int i = 0; i < contours.Length; i++)
-                {
-                    // 可以过滤太小的轮廓（根据面积）
-                    double area = Cv2.ContourArea(contours[i]);
-                    if (area > 100) // 只绘制面积大于100的轮廓
-                    {
-                        // 随机颜色或固定颜色
-                        Scalar color = new Scalar(0, 255, 0); // 绿色
-                        Cv2.DrawContours(result, contours, i, color, 2);
-
-                        // 或者绘制轮廓的外接矩形
-                        Rect boundingRect = Cv2.BoundingRect(contours[i]);
-                        //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
-                    }
-                }
-
-                //Cv2.ImShow("用轮廓检测结果", result);
-
                 string imagePath = @"C:\Users\Lenovo\Desktop\work\Test3\8.bmp";
                 string templatePath = @"C:\Users\Lenovo\Desktop\work\Test3\CNN\13.Png";
                 string outputPath = @"D:\test\result.jpg";
-
-                //图形匹配
-                //IndustrialShapeMatcher.DetectByShapeMatching(imagePath, templatePath, outpu想·tPath);
-
-                //特征点匹配
-                //FeatureMatcher.DetectByFeatureMatching(imagePath, templatePath, outputPath);
-
-                //进行找圆
-                //List<Point2D> arcPoints = new List<Point2D>();
-
-                //// 模拟左半圆弧 (圆心在 100, 100, 半径 50)
-                //for (double angle = Math.PI * 0.6; angle <= Math.PI * 1.4; angle += 0.1)
-                //{
-                //    double x = 100 + 50 * Math.Cos(angle);
-                //    double y = 100 + 50 * Math.Sin(angle);
-                //    // 添加一点随机噪声模拟真实情况
-                //    arcPoints.Add(new Point2D(x + (new Random().NextDouble() - 0.5), y + (new Random().NextDouble() - 0.5)));
-                //}
-                //// 模拟右半圆弧
-
-                //for (double angle = Math.PI * 1.8; angle <= Math.PI * 2.4; angle += 0.1)
-                //{
-                //    double x = 100 + 50 * Math.Cos(angle);
-                //    double y = 100 + 50 * Math.Sin(angle);
-                //    arcPoints.Add(new Point2D(x + (new Random().NextDouble() - 0.5), y + (new Random().NextDouble() - 0.5)));
-                //}
-
-                //var detector = new IndustrialCircleDetector();
 
                 Point2f? center = DetectCircleFromMat(test2);
 
@@ -840,7 +785,6 @@ namespace Demo7
             // 但这不是绝对的，这里简化处理
             return (minVal == 0 && maxVal == 255);
         }
-
 
         //匹配器(形状匹配)
         public class IndustrialShapeMatcher
@@ -1433,7 +1377,6 @@ namespace Demo7
 
             return harrisConrner;
         }
-
         //调用Sobel函数
         public Mat SobelMat(Mat image)
         {
@@ -1517,7 +1460,6 @@ namespace Demo7
 
             return result;
         }
-
         //调用Scharr函数
         public Mat ScharrMat(Mat image)
         {
