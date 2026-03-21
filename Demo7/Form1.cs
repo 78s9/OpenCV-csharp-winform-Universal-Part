@@ -271,14 +271,14 @@ namespace Demo7
                              new Scalar(0, 255, 0), 2);    // 绿色竖线
 
                     // 在圆心旁边显示坐标文字
-                    string text = $"Center: ({center.Value.X:F1}, {center.Value.Y:F1})";
+                    string text = $"Circle Center: ({center.Value.X:F1}, {center.Value.Y:F1})";
                     Cv2.PutText(displayImage, text,
                                 new Point((int)center.Value.X + 10, (int)center.Value.Y - 10),
                                 HersheyFonts.HersheySimplex, 0.6,
                                 new Scalar(255, 255, 255), 2);
 
                     // 显示图像
-                    //Cv2.ImShow("Detected Center", displayImage);
+                    //Cv2.ImShow("展示圆心", displayImage);
                 }
                 else
                 {
