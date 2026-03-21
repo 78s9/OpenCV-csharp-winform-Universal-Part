@@ -111,8 +111,6 @@ namespace Demo7
 
                 //test1 = ScharrMat(originalImage);
                 //test2 = SobelMat(originalImage);
-                //test3 = CornerHarrisone(originalImage);
-                //test4 = HoughCircles(test1);
 
                 // 灰度转换
                 Mat gray = new Mat();
@@ -159,11 +157,7 @@ namespace Demo7
                 //Cv2.ImShow("res", res);
 
                 Mat io = new Mat();
-                Cv2.AdaptiveThreshold(blurred, io, 255,
-                AdaptiveThresholdTypes.GaussianC,
-                ThresholdTypes.BinaryInv,
-                21, 
-                3);
+                Cv2.AdaptiveThreshold(blurred, io, 255,AdaptiveThresholdTypes.GaussianC,ThresholdTypes.BinaryInv,21, 3);
 
                 Mat ip = new Mat();
                 Cv2.Threshold(blurred, ip, 50, 255, ThresholdTypes.BinaryInv);
@@ -231,6 +225,9 @@ namespace Demo7
                 Mat edges = new Mat();
                 Cv2.Canny(binary, edges, 50, 150);
                 //Cv2.ImShow("edges",edges);
+
+                test3 = SobelMatOne(edges);
+                Cv2.ImShow("test3", test3);
 
                 string imagePath = @"C:\Users\Lenovo\Desktop\work\Test3\8.bmp";
                 string templatePath = @"C:\Users\Lenovo\Desktop\work\Test3\CNN\13.Png";
@@ -464,11 +461,11 @@ namespace Demo7
         //分界线
         public Point2f? DetectCircleFromMat(Mat image)
         {
-            // 1. 确保图像不为空
+            //确保图像不为空
             if (image == null || image.Empty())
                 return null;
 
-            // 2. 如果图像不是二值图，先进行二值化
+            //如果图像不是二值图，先进行二值化
             Mat binaryImage;
             if (image.Channels() > 1)
             {
@@ -481,16 +478,16 @@ namespace Demo7
             }
             else
             {
-                // 已经是灰度图或二值图
+                //已经是灰度图或二值图
                 binaryImage = image.Clone();
-                // 如果不是二值图，进行二值化
+                //如果不是二值图，进行二值化
                 if (!IsBinaryImage(binaryImage))
                 {
                     Cv2.Threshold(binaryImage, binaryImage, 127, 255, ThresholdTypes.Binary);
                 }
             }
 
-            // 3. 查找轮廓
+            //查找轮廓
             Point[][] contours;
             HierarchyIndex[] hierarchy;
             Cv2.FindContours(binaryImage, out contours, out hierarchy,
@@ -502,15 +499,15 @@ namespace Demo7
 
             for (int i = 0; i < contours.Length; i++)
             {
-                // 可以过滤太小的轮廓（根据面积）
+                //可以过滤太小的轮廓（根据面积）
                 double area = Cv2.ContourArea(contours[i]);
                 if (area > 100) // 只绘制面积大于100的轮廓
                 {
-                    // 随机颜色或固定颜色
+                    //随机颜色或固定颜色
                     Scalar color = new Scalar(0, 255, 0); // 绿色
                     Cv2.DrawContours(result, contours, i, color, 2);
 
-                    // 或者绘制轮廓的外接矩形
+                    //或者绘制轮廓的外接矩形
                     Rect boundingRect = Cv2.BoundingRect(contours[i]);
                     //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
                 }
@@ -524,7 +521,7 @@ namespace Demo7
                 return null;
             }
 
-            // 4. 过滤轮廓（去除太小或太大的）
+            //过滤轮廓（去除太小或太大的）
             var filteredContours = FilterContours(contours, binaryImage);
 
             if (filteredContours.Length == 0)
@@ -533,10 +530,10 @@ namespace Demo7
                 return null;
             }
 
-            // 5. 提取所有轮廓点作为点集
+            //提取所有轮廓点作为点集
             Point2f[] allPoints = ExtractAllPoints(filteredContours);
 
-            // 6. 使用RANSAC拟合圆
+            //使用RANSAC拟合圆
             var ransac = new RansacCircleDetector();
             var circle = ransac.FitCircleRansac(allPoints, iterations: 1000, distanceThreshold: 3.0f);
 
@@ -1380,7 +1377,7 @@ namespace Demo7
         //调用Sobel函数
         public Mat SobelMat(Mat image)
         {
-            Mat scr = image.Clone();
+            Mat src = image.Clone();
             Mat grad_x = new Mat();
             Mat grad_y = new Mat();
             Mat abs_grad_x = new Mat();
@@ -1388,11 +1385,11 @@ namespace Demo7
             Mat dst = new Mat();
 
             //使用Sobel
-            Cv2.Sobel(scr, grad_x, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
+            Cv2.Sobel(src, grad_x, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
             Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
             //Cv2.ImShow("X方向sobel",abs_grad_x);
 
-            Cv2.Sobel(scr, grad_y, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
+            Cv2.Sobel(src, grad_y, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
             Cv2.ConvertScaleAbs(grad_y, abs_grad_y);
             //Cv2.ImShow("Y方向sobel", abs_grad_y);
 
@@ -1456,10 +1453,114 @@ namespace Demo7
                 }
             }
 
-            Cv2.ImShow("用Sobel轮廓检测结果", result);
+            //Cv2.ImShow("用Sobel轮廓检测结果", result);
+
+            //释放Mat
+            src.Dispose();
+            grad_x.Dispose();
+            grad_y.Dispose();
+            abs_grad_x.Dispose();
+            abs_grad_y.Dispose();
+            dst.Dispose();
+            gray.Dispose();
+            binary.Dispose();
 
             return result;
         }
+
+        public Mat SobelMatOne(Mat image)
+        {
+            Mat src = image.Clone();
+            Mat grad_x = new Mat();
+            Mat grad_y = new Mat();
+            Mat abs_grad_x = new Mat();
+            Mat abs_grad_y = new Mat();
+            Mat dst = new Mat();
+
+            //使用Sobel
+            Cv2.Sobel(src, grad_x, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_x, abs_grad_x);
+            //Cv2.ImShow("X方向sobel",abs_grad_x);
+
+            Cv2.Sobel(src, grad_y, MatType.CV_16S, 1, 0, 3, 1, 1, BorderTypes.Default);
+            Cv2.ConvertScaleAbs(grad_y, abs_grad_y);
+            //Cv2.ImShow("Y方向sobel", abs_grad_y);
+
+            Cv2.AddWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, dst);
+            //Cv2.ImShow("整体图片",ds1);
+
+            Mat gray = new Mat();
+
+            // 1. 确保ds1是单通道8位图像
+            if (dst.Type() != MatType.CV_8UC1)
+            {
+                // 如果是其他类型，转换为8位单通道
+                if (dst.Type() == MatType.CV_8UC3)
+                {
+                    // 如果是三通道，转换为灰度图
+                    Cv2.CvtColor(dst, gray, ColorConversionCodes.BGR2GRAY);
+                }
+                else
+                {
+                    // 如果是其他类型（如16位），转换为8位
+                    dst.ConvertTo(gray, MatType.CV_8UC1);
+                }
+            }
+            else
+            {
+                dst.CopyTo(gray);
+            }
+
+            if (dst.Type() == MatType.CV_8UC3)
+            {
+                // 如果是三通道，转换为灰度图
+                Cv2.CvtColor(dst, gray, ColorConversionCodes.BGR2GRAY);
+            }
+
+            Mat binary = new Mat();
+            Cv2.Threshold(gray, binary, 50, 255, ThresholdTypes.Tozero);
+            //Console.WriteLine($"二值化后图像类型: {binary2.Type()}, 通道数: {binary2.Channels()}");
+
+            //查找轮廓
+            Point[][] contours;
+            HierarchyIndex[] hierarchy;
+            Cv2.FindContours(binary, out contours, out hierarchy, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+            //在原图上绘制轮廓
+            Mat result = binary.Clone();
+            Cv2.CvtColor(result, result, ColorConversionCodes.GRAY2BGR);
+
+            for (int i = 0; i < contours.Length; i++)
+            {
+                // 可以过滤太小的轮廓（根据面积）
+                double area = Cv2.ContourArea(contours[i]);
+                if (area > 100) // 只绘制面积大于100的轮廓
+                {
+                    // 随机颜色或固定颜色
+                    Scalar color = new Scalar(0, 255, 0); // 绿色
+                    Cv2.DrawContours(result, contours, i, color, 2);
+
+                    // 或者绘制轮廓的外接矩形
+                    Rect boundingRect = Cv2.BoundingRect(contours[i]);
+                    //Cv2.Rectangle(result, boundingRect, new Scalar(255, 0, 0), 2); // 蓝色矩形
+                }
+            }
+
+            Cv2.ImShow("用SobelOne轮廓检测结果", result);
+
+            //释放Mat
+            src.Dispose();
+            grad_x.Dispose();
+            grad_y.Dispose();
+            abs_grad_x.Dispose();
+            abs_grad_y.Dispose();
+            dst.Dispose();
+            gray.Dispose();
+            binary.Dispose();
+
+            return result;
+        }
+
         //调用Scharr函数
         public Mat ScharrMat(Mat image)
         {
