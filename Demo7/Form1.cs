@@ -111,6 +111,8 @@ namespace Demo7
 
                 //test1 = ScharrMat(originalImage);
                 //test2 = SobelMat(originalImage);
+                //test3 = SobelMatOne(originalImage);
+                //test4 = ScharrMat(originalImage);
 
                 // 灰度转换
                 Mat gray = new Mat();
@@ -150,10 +152,14 @@ namespace Demo7
                 //拉普拉斯算子 锐化
                 //Console.WriteLine($"原图像图像类型: {gray.Type()}, 通道数: {gray.Channels()}");
                 Mat laplacian = new Mat();
-                Cv2.Laplacian(blurred, laplacian, MatType.CV_8U, 3);
+                Cv2.Laplacian(blurred, laplacian, MatType.CV_8U, 5);
                 //Cv2.ImShow("拉普拉斯算子", laplacian);
                 Mat res = new Mat();
                 Cv2.AddWeighted(blurred, 1.0, laplacian, 1.0, 0, res);
+
+                test3 = SobelMatOne(res);
+                test4 = ScharrMat(res);
+
                 //Cv2.ImShow("res", res);
 
                 Mat io = new Mat();
@@ -226,9 +232,7 @@ namespace Demo7
                 Cv2.Canny(binary, edges, 50, 150);
                 //Cv2.ImShow("edges",edges);
 
-                test3 = SobelMatOne(edges);
-                Cv2.ImShow("test3", test3);
-
+                //这个是图形特征对比的内容
                 string imagePath = @"C:\Users\Lenovo\Desktop\work\Test3\8.bmp";
                 string templatePath = @"C:\Users\Lenovo\Desktop\work\Test3\CNN\13.Png";
                 string outputPath = @"D:\test\result.jpg";
